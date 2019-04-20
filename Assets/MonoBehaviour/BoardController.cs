@@ -9,6 +9,7 @@ public class BoardController : MonoBehaviour {
     public int width;
     public int height;
     public DotController[,] matrix;
+    
     private bool stopped = false;
     private bool destroying = false;
 
@@ -100,30 +101,29 @@ public class BoardController : MonoBehaviour {
         }
     }
 
-    private DotType findRandomDot() {
+    private DotType GetRandomType() {
         int p = Random.Range(0, dotTypes.Length - 1);
         return dotTypes[p];
     }
 
-    private DotType findRandomDot(HashSet<int> nop) {
-        int p;
-        if (nop.Count > 0) {
-            p = Random.Range(0, dotTypes.Length - (1 + nop.Count));
-            for (int xx = 0; xx < dotTypes.Length; xx++) {
-                if (nop.Contains(xx)) {
-                    p++;
-                } else if (p == xx) {
-                    break;
-                }
+    private DotType GetRandomTypeExcept(HashSet<int> nop) {
+        if (nop.Count == 0) {
+            return GetRandomType();
+        }
+
+        int p = Random.Range(0, dotTypes.Length - (1 + nop.Count));
+        for (int xx = 0; xx < dotTypes.Length; xx++) {
+            if (nop.Contains(xx)) {
+                p++;
+            } else if (p == xx) {
+                break;
             }
-        } else {
-            p = Random.Range(0, dotTypes.Length - 1);
         }
         return dotTypes[p];
     }
 
     private void RecyleDot(DotController dot, int x, int y, int destroyedAmount) {
-        dot.SetType(findRandomDot());
+        dot.SetType(GetRandomType());
         dot.FallTo(x, y, y + destroyedAmount);
         dot.Recycle();
         matrix[x, y] = dot;
@@ -131,24 +131,25 @@ public class BoardController : MonoBehaviour {
     }
 
     private void CreateNewDot(int x, int y) {
+        GameObject o = Instantiate(dotPrefab, new Vector3(x, y, 0F), Quaternion.identity);
+        DotController dot = o.GetComponent<DotController>();
+        var nop = FindForbiddenColorsForPosition(x, y);
+        dot.Configure(this, x, y, GetRandomTypeExcept(nop));
+        matrix[x, y] = dot;
+        stopped = false;
+    }
+
+    private HashSet<int> FindForbiddenColorsForPosition(int x, int y) {
         HashSet<int> nop = new HashSet<int>();
         // Previous two dots in the same row are equals?
         if (x >= 2 && matrix[x - 1, y].dot == matrix[x - 2, y].dot) {
             nop.Add(matrix[x - 1, y].dot);
         }
-
         // Previous two dots in the same column are equals?
         if (y >= 2 && matrix[x, y - 1].dot == matrix[x, y - 2].dot) {
             nop.Add(matrix[x, y - 1].dot);
         }
-
-        GameObject o = Instantiate(dotPrefab, new Vector3(x, y, 0F), Quaternion.identity);
-        DotController dot = o.GetComponent<DotController>();
-        dot.ConfigureBoard(this);
-        dot.SetType(findRandomDot(nop));
-        dot.FallTo(x, y);
-        matrix[x, y] = dot;
-        stopped = false;
+        return nop;
     }
 
     public void UserMoves(DotController dot, int x, int y) {
@@ -160,27 +161,36 @@ public class BoardController : MonoBehaviour {
         ClearHints();
         DotController other = matrix[x, y];
         SwapDots(dot, other);
-        if (CalculateMatches().Count == 0) {
-            comebackOne = dot;
-            comebackOther = other;
+        var calculateMatchesFor = CalculateMatchesFor(x, y);
+//        var calculateMatches = CalculateMatches();
+//        foreach (DotController candidate in calculateMatchesFor) {
+//            if (!calculateMatches.Contains(candidate)) {
+//                Debug.Log("CalculateMatchesFor is not working well");                
+//            }
+//        }
+        if (calculateMatchesFor.Count == 0) {
+            // Bad move! Set a rollback after the move
+            rollbackOne = dot;
+            rollbackOther = other;
         } else {
-            comebackOne = comebackOther = null;
+            rollbackOne = rollbackOther = null;
         }
     }
 
-    private void SwapDots(DotController dot, DotController other) {
+    private void SwapDots(DotController one, DotController other) {
         stopped = false;
-        matrix[(int) dot.target.x, (int) dot.target.y] = other;
-        matrix[(int) other.target.x, (int) other.target.y] = dot;
-        // Save before call to SetTarget, or we will loose the original position
-        int tempX = (int) dot.target.x;
-        int tempY = (int) dot.target.y;
-        dot.MoveSlowly((int)other.target.x, (int)other.target.y);
+        // Swap positions
+        matrix[one.x, one.y] = other;
+        matrix[other.x, other.y] = one;
+        // Swap targets
+        int tempX = one.x;
+        int tempY = one.y;
+        one.MoveSlowly(other.x, other.y);
         other.MoveSlowly(tempX, tempY);
     }
 
-    private DotController comebackOne;
-    private DotController comebackOther;
+    private DotController rollbackOne;
+    private DotController rollbackOther;
 
 
     // Update is called once per frame
@@ -193,10 +203,10 @@ public class BoardController : MonoBehaviour {
         }
 
         // Dots stopped: new board or user moved (good move or bad move)
-        if (comebackOne != null) {
+        if (rollbackOne != null) {
             // bad move!
-            SwapDots(comebackOne, comebackOther);
-            comebackOne = comebackOther = null;
+            SwapDots(rollbackOne, rollbackOther);
+            rollbackOne = rollbackOther = null;
             return;
         }
 
@@ -336,7 +346,64 @@ public class BoardController : MonoBehaviour {
     private bool IsDot(int x, int y, int p) {
         return x >= 0 && x < width && y >= 0 && y < height && matrix[x, y].dot == p;
     }
-    
+
+
+    private HashSet<DotController> CalculateMatchesFor(int x, int y) {
+        HashSet<DotController> rowMatches = new HashSet<DotController>();
+        int p = matrix[x, y].dot;
+        // To the right
+        for (int xx = x + 1; xx < width; xx++) {
+            if (matrix[xx, y].dot == p) {
+                rowMatches.Add(matrix[xx, y]);
+            } else {
+                break;
+            } 
+        }
+        // To the left
+        for (int xx = x - 1; xx >= 0; xx--) {
+            if (matrix[xx, y].dot == p) {
+                rowMatches.Add(matrix[xx, y]);
+            } else {
+                break;
+            }
+        }
+
+        HashSet<DotController> colMatches = new HashSet<DotController>();
+        // Up
+        for (int yy = y + 1; yy < height; yy++) {
+            if (matrix[x, yy].dot == p) {
+                colMatches.Add(matrix[x, yy]);
+            } else {
+                break;
+            }
+        }
+        // Down
+        for (int yy = y - 1; yy >= 0; yy--) {
+            if (matrix[x, yy].dot == p) {
+                colMatches.Add(matrix[x, yy]);
+            } else {
+                break;
+            }
+        }
+
+        if (rowMatches.Count < 2) {
+            if (colMatches.Count < 2) {
+                return new HashSet<DotController>();
+            }
+            // colMatches >= 2
+            return colMatches;
+        }
+        // rowMatches >= 2
+        if (colMatches.Count < 2) {
+            return rowMatches;
+        }
+        // rowMatches >= 2 && colMatches >= 2
+        foreach (var colMatch in colMatches) {
+            rowMatches.Add(colMatch);
+        }
+        return rowMatches;
+
+    }
 
     private HashSet<DotController> CalculateMatches() {
         HashSet<DotController> matches = new HashSet<DotController>();
@@ -345,9 +412,6 @@ public class BoardController : MonoBehaviour {
             for (int y = 0; y < height; y++) {
                 if (matrix[x, y].dot == matrix[x + 1, y].dot &&
                     matrix[x, y].dot == matrix[x + 2, y].dot) {
-                    matrix[x, y].destroyed = true;
-                    matrix[x + 1, y].destroyed = true;
-                    matrix[x + 2, y].destroyed = true;
                     matches.Add(matrix[x, y]);
                     matches.Add(matrix[x + 1, y]);
                     matches.Add(matrix[x + 2, y]);
@@ -360,9 +424,6 @@ public class BoardController : MonoBehaviour {
             for (int y = 0; y < height - 2; y++) {
                 if (matrix[x, y].dot == matrix[x, y + 1].dot &&
                     matrix[x, y].dot == matrix[x, y + 2].dot) {
-                    matrix[x, y].destroyed = true;
-                    matrix[x, y + 1].destroyed = true;
-                    matrix[x, y + 2].destroyed = true;
                     matches.Add(matrix[x, y]);
                     matches.Add(matrix[x, y + 1]);
                     matches.Add(matrix[x, y + 2]);
@@ -379,11 +440,12 @@ public class BoardController : MonoBehaviour {
         }
 
         destroying = true;
+        yield return new WaitForSeconds(0.25F);
         foreach (DotController match in matches) {
             match.NiceDestroy();
         }
 
-        yield return new WaitForSeconds(0.5F);
+        yield return new WaitForSeconds(0.25F);
 
         // Check for destroyed dots and move down
         for (int x = 0; x < width; x++) {
