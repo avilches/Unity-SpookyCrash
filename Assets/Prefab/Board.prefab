@@ -44,14 +44,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 22020a9915b4a83479ed436a2932b12b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dotPrefabs:
-  - {fileID: 4975429172183509046, guid: dd06f3d8072c7cb48b1ec7644cf68330, type: 3}
-  - {fileID: 4975429172183509046, guid: 44b61fe6a05cfa840a269f267ff2b101, type: 3}
-  - {fileID: 4975429172183509046, guid: f11ebd28a326765458a342fe8b019881, type: 3}
-  - {fileID: 4975429172183509046, guid: 2f462eaaf4e864e40834f99899df5d54, type: 3}
-  - {fileID: 4975429172183509046, guid: b35fc25bb7c94244c80f7e14a54bd58a, type: 3}
-  - {fileID: 4975429172183509046, guid: 933b943aca5243441b090872271278ea, type: 3}
-  positionPrefab: {fileID: 0}
+  dotPrefab: {fileID: 2182292398416671756, guid: 569e7dc79a4734747bfb0cd22617e11f,
+    type: 3}
+  dotTypes:
+  - {fileID: 11400000, guid: 15fc316ac18e87a438037a8c7329dc1a, type: 2}
+  - {fileID: 11400000, guid: 1a3143a1c61af1c499aa6feb6fa502db, type: 2}
+  - {fileID: 11400000, guid: a190071c819f99c428b79d1f72e32ef0, type: 2}
+  - {fileID: 11400000, guid: c8711dee28afe23479d7b0382a4c5c88, type: 2}
+  - {fileID: 11400000, guid: b4d0912617c41574f9506342d32aeb33, type: 2}
+  - {fileID: 11400000, guid: 9df65e0e1cb709941bbd3de6a8a06939, type: 2}
   width: 5
   height: 7
 --- !u!1 &1397577154251460942
