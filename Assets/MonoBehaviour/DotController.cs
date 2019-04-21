@@ -63,17 +63,20 @@ public class DotController : MonoBehaviour {
         clickEnd = cam.ScreenToWorldPoint(Input.mousePosition);
         Dir4 dir4 = Direction.CalculateDir4(clickStart, clickEnd, 0.4F);
         switch (dir4) {
+            case Dir4.None:
+                board.UserClicks(this);
+                break; 
             case Dir4.N:
-                board.UserMoves(this, (int) target.x, (int) target.y + 1);
+                board.UserMoves(this, x, y + 1);
                 break;
             case Dir4.S:
-                board.UserMoves(this, (int) target.x, (int) target.y - 1);
+                board.UserMoves(this, x, y - 1);
                 break;
             case Dir4.E:
-                board.UserMoves(this, (int) target.x + 1, (int) target.y);
+                board.UserMoves(this, x + 1, y);
                 break;
             case Dir4.W:
-                board.UserMoves(this, (int) target.x - 1, (int) target.y);
+                board.UserMoves(this, x - 1, y);
                 break;
         }
     }
@@ -116,7 +119,7 @@ public class DotController : MonoBehaviour {
         stopped = false;
     }
 
-    private void Update() {
+    void Update() {
         if (!stopped) {
             transform.position = Vector2.MoveTowards(transform.position, target, Time.deltaTime * speed);
             stopped = Math.Abs(Vector2.Distance(transform.position, target)) < 0.01F;

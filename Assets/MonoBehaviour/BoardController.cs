@@ -3,6 +3,48 @@ using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+class MiniList<T> {
+    public int Count { get; private set; }
+    private int Pos;
+    private readonly T[] Array;
+
+    public MiniList(int maxSize) {
+        Array = new T[maxSize];
+    }
+
+    public void Add(T ele) {
+        if (Count == Array.Length) {
+            throw new IndexOutOfRangeException("Impossible adding more element, array size (" + Count+ ")");
+        }
+        Array[Count++] = ele;
+    }
+
+    public bool Contains(T ele) {
+        for (int x = 0; x < Count; x++) {
+            if (Array[x].Equals(ele)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public T this[int index] {
+        get {
+            if (index > Count) {
+                throw new IndexOutOfRangeException("Index: " + index + ", Count: " + Count);
+            }
+            return Array[index];
+        }
+
+        set {
+            if (index > Count) {
+                throw new IndexOutOfRangeException("Index: " + index + ", Count: " + Count);
+            }
+            Array[index] = value;
+        }
+    }
+}
+
 public class BoardController : MonoBehaviour {
     public GameObject dotPrefab;
     public DotType[] dotTypes;
@@ -23,21 +65,26 @@ public class BoardController : MonoBehaviour {
         CreateBoard();
     }
 
-    public void HIDEALL() {
+    public void LoadBoard() {
+        // carga
+        ClearHints();
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                matrix[x, y].gameObject.SetActive(false);
+                matrix[x, y].SetType(dotTypes[PlayerPrefs.GetInt(x+"."+y)]);
             }
         }
+        ShowHints();
 
     }
 
-    public void SHOWALL() {
+    public void SaveBoard() {
+        // Salvar
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                matrix[x, y].gameObject.SetActive(true);
+                PlayerPrefs.SetInt(x+"."+y, matrix[x, y].dot);
             }
         }
+        PlayerPrefs.Save();
 
     }
 
@@ -52,7 +99,7 @@ public class BoardController : MonoBehaviour {
                     CreateNewDot(x, y);
                 }
             }
-            ShowHints();
+            ShowHints(); 
             if (hints == 0) {
                 Debug.Log("Retry " + xx);
                 EnsureNoDeadLocks();
@@ -66,15 +113,13 @@ public class BoardController : MonoBehaviour {
         int p = 0;
         while (++p < 1000) {
             ClearHints();
-            int x = Random.Range(0, width - 2);
-            int y = Random.Range(1, height - 2);
+            int x = Random.Range(0, width - 1);
+            int y = Random.Range(1, height - 1);
             DotType backup = matrix[x + 1, y].dotType;
             matrix[x + 1, y].SetType(matrix[x, y].dotType);
             Debug.Log("Setting "+(x+1)+","+y+" as a copy from "+x+","+y);
             var matches = CalculateMatches().Count;
-            ShowHints();
-            int newHints = hints;
-            ClearHints();
+            int newHints = ShowHints();
             if (matches > 0) {
                 // rollback
                 Debug.Log("Hints "+newHints+" but matches "+matches+"! Rollback");
@@ -86,38 +131,37 @@ public class BoardController : MonoBehaviour {
                 Debug.Log("Hints still "+newHints+", changing more...");
             }
         }
+        int newHints2 = ShowHints();
+        if (newHints2 < 3) {
+            Debug.Log("BUFFFFFFFFFF TOO MUCH TIME");
+        }
         ClearHints();
         ShowHints();
     }
 
     private void DestroyBoard() {
-        if (matrix != null) {
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    Destroy(matrix[x, y].gameObject);
-                    matrix[x, y] = null;
-                }
+        if (matrix == null) return;
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                Destroy(matrix[x, y].gameObject);
+                matrix[x, y] = null;
             }
         }
     }
 
     private DotType GetRandomType() {
-        int p = Random.Range(0, dotTypes.Length - 1);
-        return dotTypes[p];
+        return dotTypes[Random.Range(0, dotTypes.Length)];
     }
 
-    private DotType GetRandomTypeExcept(HashSet<int> nop) {
-        if (nop.Count == 0) {
-            return GetRandomType();
+    private DotType GetRandomTypeExcept(MiniList<int> nop) {
+        DotType dotType = GetRandomType();
+        if (nop == null || nop.Count == 0) {
+            return dotType;
         }
 
-        int p = Random.Range(0, dotTypes.Length - (1 + nop.Count));
-        for (int xx = 0; xx < dotTypes.Length; xx++) {
-            if (nop.Contains(xx)) {
-                p++;
-            } else if (p == xx) {
-                break;
-            }
+        int p = dotType.number;
+        while (nop.Contains(p)) {
+            p = p < dotTypes.Length - 1 ? p + 1 : 0;
         }
         return dotTypes[p];
     }
@@ -138,9 +182,15 @@ public class BoardController : MonoBehaviour {
         matrix[x, y] = dot;
         stopped = false;
     }
+    
+    private void FallTo(DotController dot, int x, int y) {
+        matrix[x, y] = dot;
+        matrix[x, y].FallTo(x, y);
+    }
 
-    private HashSet<int> FindForbiddenColorsForPosition(int x, int y) {
-        HashSet<int> nop = new HashSet<int>();
+
+    private MiniList<int> FindForbiddenColorsForPosition(int x, int y) {
+        MiniList<int> nop = new MiniList<int>(2);
         // Previous two dots in the same row are equals?
         if (x >= 2 && matrix[x - 1, y].dot == matrix[x - 2, y].dot) {
             nop.Add(matrix[x - 1, y].dot);
@@ -238,19 +288,19 @@ public class BoardController : MonoBehaviour {
         hints = -1;
     }
 
-    private void ShowHints() {
+    private int ShowHints() {
         hints = 0;
-        if (hints == maxHints) return;
+        if (hints == maxHints) return hints;
         for (int x = 0; x < width - 2; x++) {
             for (int y = 0; y < height; y++) {
                 if (matrix[x, y].dot == matrix[x + 1, y].dot &&
                     matrix[x, y].dot != matrix[x + 2, y].dot) {
                     hints += CheckLastDotRow(x + 2, y, matrix[x, y].dot) ? 1 : 0;
-                    if (hints == maxHints) return;
+                    if (hints == maxHints) return hints;
                 } else if (matrix[x, y].dot != matrix[x + 1, y].dot &&
                            matrix[x + 1, y].dot == matrix[x + 2, y].dot) {
                     hints += CheckFirstDotRow(x, y, matrix[x + 2, y].dot) ? 1 : 0;
-                    if (hints == maxHints) return;
+                    if (hints == maxHints) return hints;
                 }
             }
         }
@@ -260,14 +310,16 @@ public class BoardController : MonoBehaviour {
                 if (matrix[x, y].dot == matrix[x, y + 1].dot &&
                     matrix[x, y].dot != matrix[x, y + 2].dot) {
                     hints += CheckFirstDotColumn(x, y + 2, matrix[x, y].dot) ? 1 : 0;
-                    if (hints == maxHints) return;
+                    if (hints == maxHints) return hints;
                 } else if (matrix[x, y].dot != matrix[x, y + 1].dot &&
                            matrix[x, y + 1].dot == matrix[x, y + 2].dot) {
                     hints += CheckLastDotColumn(x, y, matrix[x, y + 2].dot) ? 1 : 0;
-                    if (hints == maxHints) return;
+                    if (hints == maxHints) return hints;
                 }
             }
         }
+
+        return hints;
     }
 
     private bool CheckLastDotRow(int x, int y, int p) {
@@ -448,10 +500,23 @@ public class BoardController : MonoBehaviour {
         yield return new WaitForSeconds(0.25F);
 
         // Check for destroyed dots and move down
+        ReorgColumns();
+        ClearHints();
+        int h = ShowHints();
+        ClearHints();
+        if (h == 0) {
+            Debug.Log("FUCK");
+        }
+
+        destroying = false;
+    }
+
+    private void ReorgColumns() {
+        // Loop over the columns
         for (int x = 0; x < width; x++) {
             // Reorganize the column
-            List<DotController> columnAlive = new List<DotController>();
-            List<DotController> columnDestroyed = new List<DotController>();
+            MiniList<DotController> columnAlive = new MiniList<DotController>(height);
+            MiniList<DotController> columnDestroyed = new MiniList<DotController>(height);
             for (int y = 0; y < height; y++) {
                 if (matrix[x, y].destroyed) {
                     columnDestroyed.Add(matrix[x, y]);
@@ -462,18 +527,17 @@ public class BoardController : MonoBehaviour {
 
             // Move them to fill the holes
             for (int yy = 0; yy < columnAlive.Count; yy++) {
-                matrix[x, yy] = columnAlive[yy];
-                matrix[x, yy].FallTo(x, yy);
+                FallTo(columnAlive[yy], x, yy);
             }
 
             // Add more on top
             for (int yyy = 0; yyy < columnDestroyed.Count; yyy++) {
-                RecyleDot(columnDestroyed[yyy], x, yyy+columnAlive.Count, columnDestroyed.Count);
+                RecyleDot(columnDestroyed[yyy], x, yyy + columnAlive.Count, columnDestroyed.Count);
             }
         }
 
-        destroying = false;
     }
+
 
 
     private bool CalculateStopped() {
@@ -486,5 +550,9 @@ public class BoardController : MonoBehaviour {
         }
 
         return true;
+    }
+
+    public void UserClicks(DotController dot) {
+        dot.SetType(GetRandomTypeExcept(FindForbiddenColorsForPosition(dot.x, dot.y)));
     }
 }
