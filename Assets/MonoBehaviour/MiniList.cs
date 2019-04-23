@@ -24,6 +24,7 @@ class MiniList<T> : IEnumerable<T> {
     }
 
     public bool Contains(T ele) {
+        if (Count == 0) return false;
         for (int x = 0; x < Count; x++) {
             if (Array[x].Equals(ele)) {
                 return true;

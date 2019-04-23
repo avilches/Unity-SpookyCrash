@@ -8,6 +8,7 @@ public class DotController : MonoBehaviour {
     public GameObject hintRight;
     public GameObject hintLeft;
     public GameObject explosionPrefab;
+    public GameObject debugText;
 
     [NonSerialized] public Vector2 target;
     [NonSerialized] public bool stopped;
@@ -35,9 +36,29 @@ public class DotController : MonoBehaviour {
 
     public bool destroyed { get; private set; }
 
+    public void OnValidate() {
+        ConfigureTextMeshSortingLayer();
+    }
 
     private void Awake() {
         cam = Camera.main;
+        ConfigureTextMeshSortingLayer();
+    }
+
+    public void ConfigureTextMeshSortingLayer() {
+        var meshRenderer = debugText.GetComponent<MeshRenderer>();
+        meshRenderer.sortingLayerName = "dots";
+        meshRenderer.sortingOrder = 1;
+    }
+
+    public void SetDebugText(string text) {
+        debugText.SetActive(true);
+        debugText.GetComponent<TextMesh>().text = text;
+    }
+
+    public void ClearDebugText() {
+        debugText.SetActive(false);
+        debugText.GetComponent<TextMesh>().text = "";
     }
 
     public void Configure(BoardController board, int x, int y, DotType dotType) {
@@ -85,15 +106,21 @@ public class DotController : MonoBehaviour {
     public void NiceDestroy() {
         destroyed = true;
         gameObject.SetActive(false);
-        
+
+        ClearDebugText();
+
         GameObject explosion = Instantiate(explosionPrefab, new Vector3(transform.position.x,
             transform.position.y, -1F), Quaternion.identity);
         explosion.GetComponent<Renderer>().sortingLayerName = "particles";
         Destroy(explosion, 0.2F);
     }
 
+
     public void Recycle() {
         destroyed = false;
+
+        ClearDebugText();
+        
         gameObject.SetActive(true);
     }
 
