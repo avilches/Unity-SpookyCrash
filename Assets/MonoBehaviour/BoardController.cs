@@ -197,7 +197,7 @@ public class BoardController : MonoBehaviour {
 
     private void validateCalculateMatches(DotController dot, DotController other) {
         var calculateMatchesDot = CalculateMatchesFor(dot.x, dot.y);
-        var calculateMatches = CalculateMatches().matches;
+        var calculateMatches = MarkToBeDestroyedAndCalculateMatches().matches;
         foreach (DotController candidate in calculateMatchesDot) {
             if (!calculateMatches.Contains(candidate)) {
                 throw new Exception("validateCalculateMatches. Match not found for dot");
@@ -251,7 +251,7 @@ public class BoardController : MonoBehaviour {
         }
 
         // good move or still new board
-        var matches = CalculateMatches();
+        var matches = MarkToBeDestroyedAndCalculateMatches();
         if (matches.HasMatches()) {
             // matches!
             StartCoroutine(DestroyMatchesAndFill(matches));
@@ -452,9 +452,11 @@ public class BoardController : MonoBehaviour {
         public int firstRowX = -1;
         public int firstColX = -1;
         public bool[] dirtyCol;
+        private DotController[,] matrix;
 
-        public Matches(int width, int height) {
-            matches = new MiniList<DotController>(height * width);
+        public Matches(DotController[,] matrix, int width, int height) {
+            this.matrix = matrix;
+            matches = new MiniList<DotController>(width * height);
             dirtyCol = new bool[width];
         }
 
@@ -478,25 +480,17 @@ public class BoardController : MonoBehaviour {
             firstColX = x;
         }
 
-        public void AddIfNotExists(DotController dot) {
-            if (!matches.Contains(dot)) {
-                dirtyCol[dot.x] = true;
-                matches.Add(dot);
-            }
+        public void MarkToBeDestroyed(DotController dot) {
+            if (matrix[dot.x, dot.y].destroyed) return;
+            dirtyCol[dot.x] = true;
+            dot.MarkToBeDestroyed();
+            matches.Add(dot);
         }
 
-        public bool HasMatch(int x, int y) {
-            for (int i = 0; i < matches.Count; i++) {
-                if (matches[i].x == x && matches[i].y == y) return true;
-            }
-
-            return false;
-        }
     }
 
-    private Matches CalculateMatches() {
-        Matches matches = new Matches(width, height);
-        // Horizontal matches
+    private Matches MarkToBeDestroyedAndCalculateMatches() {
+        Matches matches = new Matches(matrix, width, height);
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 if (x >= 2) {
@@ -506,9 +500,9 @@ public class BoardController : MonoBehaviour {
                         if (!matches.HasFirstRow()) {
                             matches.SetFirstRow(x - 2);
                         }
-                        matches.AddIfNotExists(matrix[x, y]);
-                        matches.AddIfNotExists(matrix[x - 1, y]);
-                        matches.AddIfNotExists(matrix[x - 2, y]);
+                        matches.MarkToBeDestroyed(matrix[x, y]);
+                        matches.MarkToBeDestroyed(matrix[x - 1, y]);
+                        matches.MarkToBeDestroyed(matrix[x - 2, y]);
                     }
                 }
 
@@ -519,9 +513,9 @@ public class BoardController : MonoBehaviour {
                         if (!matches.HasFirstCol()) {
                             matches.SetFirstCol(x);
                         }
-                        matches.AddIfNotExists(matrix[x, y]);
-                        matches.AddIfNotExists(matrix[x, y - 1]);
-                        matches.AddIfNotExists(matrix[x, y - 2]);
+                        matches.MarkToBeDestroyed(matrix[x, y]);
+                        matches.MarkToBeDestroyed(matrix[x, y - 1]);
+                        matches.MarkToBeDestroyed(matrix[x, y - 2]);
                     }
                 }
             }

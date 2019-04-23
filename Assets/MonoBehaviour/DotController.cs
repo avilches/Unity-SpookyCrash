@@ -103,8 +103,12 @@ public class DotController : MonoBehaviour {
     }
 
 
-    public void NiceDestroy() {
+    public void MarkToBeDestroyed() {
         destroyed = true;
+    }
+
+    public void NiceDestroy() {
+        if (!destroyed) return;
         gameObject.SetActive(false);
 
         ClearDebugText();
