@@ -1,9 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using TMPro;
+using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Assertions;
 using Random = UnityEngine.Random;
 
+public enum BoardState {
+    unknown, destroying, moving, ready
+}
 public class BoardController : MonoBehaviour {
     public GameObject dotPrefab;
     public DotType[] dotTypes;
@@ -11,10 +16,30 @@ public class BoardController : MonoBehaviour {
     public int height;
 
     public int maxTypes = 5;
+
+    private GameObject _textMeshPro;
     
+
     private DotController[,] matrix;
-    private bool stopped = false;
-    private bool destroying = false;
+    private BoardState state;
+    
+    private bool destroying {
+        get { return state == BoardState.destroying; }
+    }
+    private bool moving {
+        get { return state == BoardState.moving; }
+    }
+    private bool ready {
+        get { return state == BoardState.ready; }
+    }
+    private bool unknown {
+        get { return state == BoardState.unknown; }
+    }
+    private void SetStateDestroying() { state = BoardState.destroying;}
+    private void SetStateReady() { state = BoardState.ready;}
+    private void SetStateMoving() { state = BoardState.moving;}
+    private void SetStateUnknown() { state = BoardState.unknown;}
+
     private int maxHints = 3;
     
     
@@ -24,6 +49,8 @@ public class BoardController : MonoBehaviour {
 
     // Start is called before the first frame update
     void Start() {
+        _textMeshPro = GameObject.Find("Score");
+        
         Assert.IsTrue(width >= 5, "Width should be 6 at least");
         CreateBoard();
     }
@@ -136,7 +163,7 @@ public class BoardController : MonoBehaviour {
         dot.FallTo(x, y, y + destroyedAmount);
         dot.Recycle();
         matrix[x, y] = dot;
-        stopped = false;
+        SetStateMoving();
     }
 
     private void CreateNewDot(int x, int y, DotType dotType = null) {
@@ -149,7 +176,7 @@ public class BoardController : MonoBehaviour {
 
         dot.Configure(this, x, y, dotType);
         matrix[x, y] = dot;
-        stopped = false;
+        SetStateMoving();
     }
 
     private void FallTo(DotController dot, int x, int y) {
@@ -174,10 +201,11 @@ public class BoardController : MonoBehaviour {
     }
 
     public void UserMoves(DotController dot, int x, int y) {
-        if (!stopped || destroying ||
+        if (!ready ||
             x < 0 || x >= width || y < 0 || y >= height) {
             return;
         }
+        SetStateMoving();
 
         ClearHints();
         DotController other = matrix[x, y];
@@ -221,7 +249,7 @@ public class BoardController : MonoBehaviour {
     }
 
     private void SwapDots(DotController one, DotController other) {
-        stopped = false;
+        SetStateMoving();
         // Swap positions
         matrix[one.x, one.y] = other;
         matrix[other.x, other.y] = one;
@@ -238,32 +266,34 @@ public class BoardController : MonoBehaviour {
 
     // Update is called once per frame
     void Update() {
-        if (destroying) return;
-        if (!stopped) {
-            // Dots are still moving...
-            stopped = CalculateStopped();
+        if (destroying) {
             return;
         }
-
-        // Dots stopped: new board or user moved (good move or bad move)
-        if (rollbackOne != null) {
-            // bad move!
-            SwapDots(rollbackOne, rollbackOther);
-            rollbackOne = rollbackOther = null;
-            return;
+        if (moving) {
+            if (CalculateStopped()) {
+                SetStateUnknown();
+                return;
+            }
         }
-        
-//        SE calcula todo el rato
 
-        // good move or still new board
-        var matches = MarkToBeDestroyedAndCalculateMatches();
-        if (matches.HasMatches()) {
-            // matches!
-            StartCoroutine(DestroyMatchesAndFill(matches));
-        } else {
-            if (hints == -1) {
-                ClearHints();
-                ShowHints();
+        if (unknown) {
+            if (rollbackOne != null) {
+                // bad move!
+                SwapDots(rollbackOne, rollbackOther);
+                rollbackOne = rollbackOther = null;
+                return;
+            }
+
+            var matches = MarkToBeDestroyedAndCalculateMatches();
+            if (matches.HasMatches()) {
+                // matches!
+                StartCoroutine(DestroyMatchesAndFill(matches));
+            } else {
+                SetStateReady();
+                if (hints == -1) {
+                    ClearHints();
+                    ShowHints();
+                }
             }
         }
     }
@@ -454,8 +484,8 @@ public class BoardController : MonoBehaviour {
 
     class Matches {
         public readonly MiniList<DotController> matches;
-        public int firstRowX = -1;
-        public int firstColX = -1;
+        public DotController firstRow;
+        public DotController firstCol;
         public bool[] dirtyCol;
         private DotController[,] matrix;
         public bool col4 = false;
@@ -472,24 +502,24 @@ public class BoardController : MonoBehaviour {
             dirtyCol = new bool[width];
         }
 
-        public bool HasFirstRow() {
-            return firstRowX != -1;
+        public bool HasFirstRowWithDifferentType(DotType type) {
+            return firstRow != null && firstRow.dotType.number != type.number;
         }
 
-        public void SetFirstRow(int x) {
-            firstRowX = x;
+        public void SetFirstRow(DotController x) {
+            firstRow = x;
         }
 
         public bool HasMatches() {
             return !matches.Empty;
         }
 
-        public bool HasFirstCol() {
-            return firstColX != -1;
+        public bool HasFirstColWithDifferentType(DotType type) {
+            return firstCol != null && firstCol.dotType.number != type.number;
         }
 
-        public void SetFirstCol(int x) {
-            firstColX = x;
+        public void SetFirstCol(DotController x) {
+            firstCol = x;
         }
 
         public void MarkToBeDestroyed(DotController dot) {
@@ -499,6 +529,9 @@ public class BoardController : MonoBehaviour {
             matches.Add(dot);
         }
 
+        public bool HasDot(DotController dot) {
+            return matches.Contains(dot);
+        }
     }
 
     private Matches MarkToBeDestroyedAndCalculateMatches() {
@@ -509,10 +542,10 @@ public class BoardController : MonoBehaviour {
                     // Check for row matches 3 to the left
                     if (matrix[x, y].dot == matrix[x - 1, y].dot &&
                         matrix[x, y].dot == matrix[x - 2, y].dot) {
-                        if (matches.HasFirstRow()) {
+                        if (matches.HasFirstRowWithDifferentType(matrix[x, y].dotType)) {
                             matches.doubleRow = true;
                         } else {
-                            matches.SetFirstRow(x - 2);
+                            matches.SetFirstRow(matrix[x - 2, y]);
                         }
                         matches.MarkToBeDestroyed(matrix[x, y]);
                         matches.MarkToBeDestroyed(matrix[x - 1, y]);
@@ -530,10 +563,10 @@ public class BoardController : MonoBehaviour {
                     // Check for col matches 3 to down
                     if (matrix[x, y].dot == matrix[x, y - 1].dot &&
                         matrix[x, y].dot == matrix[x, y - 2].dot) {
-                        if (matches.HasFirstCol()) {
+                        if (matches.HasFirstColWithDifferentType(matrix[x, y].dotType)) {
                             matches.doubleCol = true;
                         } else {
-                            matches.SetFirstCol(x);
+                            matches.SetFirstCol(matrix[x, y]);
                         }
                         matches.MarkToBeDestroyed(matrix[x, y]);
                         matches.MarkToBeDestroyed(matrix[x, y - 1]);
@@ -557,39 +590,54 @@ public class BoardController : MonoBehaviour {
             yield break;
         }
 
-        destroying = true;
-        yield return new WaitForSeconds(0.525F);
+        SetStateDestroying();
+        yield return new WaitForSeconds(0.225F);
 
         for (int i = 0; i < matches.matches.Count; i++) {
             matches.matches[i].NiceDestroy();
         }
 
-        if (matches.row4) {
-            Debug.Log("ROW4!");
-        }
-        if (matches.row5) {
-            Debug.Log("ROW5!!!");
-        }
+        ShowScore(matches);
 
-        if (matches.doubleRow) {
-            Debug.Log("doubleRow!!!");
-        }
-
-        if (matches.col4) {
-            Debug.Log("COL4!");
-        }
-        if (matches.col5) {
-            Debug.Log("COL5!!!");
-        }
-        if (matches.doubleCol) {
-            Debug.Log("doubleCol!!!");
-        }
-
-        yield return new WaitForSeconds(0.725F);
+        yield return new WaitForSeconds(0.125F);
 
         // Check for destroyed dots and move down
         ReplaceDestroyed(matches);
-        destroying = false;
+        SetStateMoving();
+    }
+
+    private void ShowScore(Matches matches) {
+        Debug.Log(matches.matches.Count+" points!");
+        var text = matches.matches.Count+" points!";
+        
+        if (matches.row4) {
+            Debug.Log("ROW4!");
+            text = text + " (row 4)";
+        }
+
+        if (matches.row5) {
+            Debug.Log("ROW5!!!");
+            text = text + " (row 5)";
+        }
+
+        if (matches.doubleRow) {
+            text = text + " Doble row!";
+        }
+
+        if (matches.col4) {
+            text = text + " (col 4)";
+        }
+
+        if (matches.col5) {
+            text = text + " (col 5)";
+        }
+
+        if (matches.doubleCol) {
+            text = text + " Doble col!";
+        }
+
+        _textMeshPro.GetComponent<TMP_Text>().text = text;
+
     }
 
     private void ReplaceDestroyed(Matches matches) {
@@ -634,14 +682,14 @@ public class BoardController : MonoBehaviour {
             Debug.Log("FUCK");
         }
 
-        if (matches.HasFirstRow()) {
+        if (matches.firstRow != null) {
             // Avoid deadlock creating a good row that can be matched in the next move
-            ForceRow(matches.firstRowX);            
+            ForceRow(matches.firstRow.x);            
         }
 
-        if (matches.HasFirstCol()) {
+        if (matches.firstCol != null) {
             // Avoid deadlock creating a good column that can be matched in the next move
-            ForceCol(matches.firstColX);            
+            ForceCol(matches.firstCol.x);            
         }
         
     }

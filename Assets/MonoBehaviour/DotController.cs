@@ -1,5 +1,4 @@
 ﻿using System;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 public class DotController : MonoBehaviour {
@@ -135,7 +134,7 @@ public class DotController : MonoBehaviour {
     }
 
     public void MoveSlowly(int x, int y) {
-        speed = 4F;
+        speed = 6F;
         ChangeTarget(x, y);
     }
 
