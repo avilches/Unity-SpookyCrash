@@ -1,15 +1,32 @@
 ﻿using System;
 using System.Collections.Generic;
 using TMPro;
-using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.Assertions;
+using Assert = UnityEngine.Assertions.Assert;
 using Random = UnityEngine.Random;
 
 public enum BoardState {
-    unknown, destroying, moving, ready
+    unknown,
+    destroying,
+    moving,
+    ready
 }
+
 public class BoardController : MonoBehaviour {
+    /*
+     TASKS
+     - Store scoring: points, rows, cols, types
+     - Objetive
+     
+     Visual
+     - Animate hints     
+     - Explosion + animate scoring     
+     - Sounds
+     - Replace elements    
+     */
+
+    # region config
+
     public GameObject dotPrefab;
     public DotType[] dotTypes;
     public int width;
@@ -17,54 +34,61 @@ public class BoardController : MonoBehaviour {
 
     public int maxTypes = 5;
 
+    # endregion
+
     private GameObject _textMeshPro;
-    
+
 
     private DotController[,] matrix;
     private BoardState state;
-    
+
     private bool destroying {
         get { return state == BoardState.destroying; }
     }
+
     private bool moving {
         get { return state == BoardState.moving; }
     }
+
     private bool ready {
         get { return state == BoardState.ready; }
     }
+
     private bool unknown {
         get { return state == BoardState.unknown; }
     }
-    private void SetStateDestroying() { state = BoardState.destroying;}
-    private void SetStateReady() { state = BoardState.ready;}
-    private void SetStateMoving() { state = BoardState.moving;}
-    private void SetStateUnknown() { state = BoardState.unknown;}
 
-    private int maxHints = 3;
-    
-    
+    private void SetStateDestroying() {
+        state = BoardState.destroying;
+    }
 
-    // If hints is set to -1, new hints will be found (up to MAX_HINTS) in the next frame
-    private int hints = -1;
+    private void SetStateReady() {
+        state = BoardState.ready;
+    }
+
+    private void SetStateMoving() {
+        state = BoardState.moving;
+    }
+
+    private void SetStateUnknown() {
+        state = BoardState.unknown;
+    }
 
     // Start is called before the first frame update
     void Start() {
         _textMeshPro = GameObject.Find("Score");
-        
+
         Assert.IsTrue(width >= 5, "Width should be 6 at least");
         CreateBoard();
     }
 
     public void LoadBoard() {
         // carga
-        ClearHints();
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 matrix[x, y].SetType(dotTypes[PlayerPrefs.GetInt(x + "." + y)]);
             }
         }
-
-        ShowHints();
     }
 
     public void SaveBoard() {
@@ -205,6 +229,7 @@ public class BoardController : MonoBehaviour {
             x < 0 || x >= width || y < 0 || y >= height) {
             return;
         }
+
         SetStateMoving();
 
         ClearHints();
@@ -245,7 +270,6 @@ public class BoardController : MonoBehaviour {
         if (calculateMatchesDot.Count + calculateMatchesOther.Count != calculateMatches.Count) {
             throw new Exception("validateCalculateMatches. Wrong final count");
         }
-
     }
 
     private void SwapDots(DotController one, DotController other) {
@@ -269,6 +293,7 @@ public class BoardController : MonoBehaviour {
         if (destroying) {
             return;
         }
+
         if (moving) {
             if (CalculateStopped()) {
                 SetStateUnknown();
@@ -290,141 +315,209 @@ public class BoardController : MonoBehaviour {
                 StartCoroutine(DestroyMatchesAndFill(matches));
             } else {
                 SetStateReady();
-                if (hints == -1) {
-                    ClearHints();
-                    ShowHints();
-                }
+                ClearHints();
+                ShowHints();
             }
         }
     }
 
-    private LinkedList<DotController> hintsToDisable = new LinkedList<DotController>();
-
-    public void AddHintToDisable(DotController dot) {
-        hintsToDisable.AddLast(dot);
-    }
+    private MiniList<DotController> hints = null;
 
     private void ClearHints() {
-        foreach (DotController dot in hintsToDisable) {
-            dot.DisableHints();
+        if (hints != null)
+        foreach (DotController dot in hints) {
+            dot.DisableHint();
         }
 
-        hintsToDisable.Clear();
-        hints = -1;
+        hints = null;
     }
 
-    private int ShowHints() {
-        hints = 0;
-        if (hints == maxHints) return hints;
-        for (int x = 0; x < width - 2; x++) {
-            for (int y = 0; y < height; y++) {
-                if (matrix[x, y].dot == matrix[x + 1, y].dot &&
-                    matrix[x, y].dot != matrix[x + 2, y].dot) {
-                    hints += CheckLastDotRow(x + 2, y, matrix[x, y].dot) ? 1 : 0;
-                    if (hints == maxHints) return hints;
-                } else if (matrix[x, y].dot != matrix[x + 1, y].dot &&
-                           matrix[x + 1, y].dot == matrix[x + 2, y].dot) {
-                    hints += CheckFirstDotRow(x, y, matrix[x + 2, y].dot) ? 1 : 0;
-                    if (hints == maxHints) return hints;
-                }
+    private void ShowHints() {
+        ClearHints();
+        hints = FindHints();
+
+        if (hints != null) {
+            foreach (DotController dot in hints) {
+                dot.EnableHint();
             }
         }
+    }
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height - 2; y++) {
-                if (matrix[x, y].dot == matrix[x, y + 1].dot &&
-                    matrix[x, y].dot != matrix[x, y + 2].dot) {
-                    hints += CheckFirstDotColumn(x, y + 2, matrix[x, y].dot) ? 1 : 0;
-                    if (hints == maxHints) return hints;
-                } else if (matrix[x, y].dot != matrix[x, y + 1].dot &&
-                           matrix[x, y + 1].dot == matrix[x, y + 2].dot) {
-                    hints += CheckLastDotColumn(x, y, matrix[x, y + 2].dot) ? 1 : 0;
-                    if (hints == maxHints) return hints;
+    private MiniList<DotController> FindHints() {
+        MiniList<DotController> hints = null;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (x < width - 3) {
+                    hints = GetCandidateTypeRow3(y, x, x + 1, x + 2, x + 3);
+                    if (hints != null) break;
+                }
+
+                if (x < width - 2) {
+                    hints = GetCandidateTypeRowL(y, x, x + 1, x + 2);
+                    if (hints != null) break;
+                }
+
+                if (y < height - 3) {
+                    hints = GetCandidateTypeCol3(x, y, y + 1, y + 2, y + 3);
+                    if (hints != null) break;
+                }
+
+                if (y < height - 2) {
+                    hints = GetCandidateTypeColL(x, y, y + 1, y + 2);
+                    if (hints != null) break;
                 }
             }
+            if (hints != null) break;
         }
-
         return hints;
     }
 
-    private bool CheckLastDotRow(int x, int y, int p) {
-        // [x] [x] [?]
-        // We have to check if dots up, down or right of [?] is == p
-        return ShowHintLeft(x + 1, y, p) || // right dot
-               ShowHintUp(x, y - 1, p) || // down dot
-               ShowHintDown(x, y + 1, p); // up dot
-    }
-
-    private bool CheckFirstDotRow(int x, int y, int p) {
-        // [?] [x] [x] 
-        // We have to check if dots up, down or left of [?] is == p
-        return ShowHintRight(x - 1, y, p) || // left dot
-               ShowHintUp(x, y - 1, p) || // down dot
-               ShowHintDown(x, y + 1, p); // up dot
-    }
-
-    private bool CheckFirstDotColumn(int x, int y, int p) {
-        // [?]
-        // [x]
-        // [x] 
-        // We have to check if dots up, left or right of [?] is == p
-        return ShowHintRight(x - 1, y, p) || // left dot
-               ShowHintLeft(x + 1, y, p) || // right dot
-               ShowHintDown(x, y + 1, p); // up dot
-    }
-
-    private bool CheckLastDotColumn(int x, int y, int p) {
-        // [x]
-        // [x] 
-        // [?]
-        // We have to check if dots down, left or right of [?] is == p
-        return ShowHintRight(x - 1, y, p) || // left dot
-               ShowHintLeft(x + 1, y, p) || // right dot
-               ShowHintUp(x, y - 1, p); // down dot
-    }
-
-    private bool ShowHintLeft(int x, int y, int p) {
-        if (IsDot(x, y, p)) {
-            matrix[x, y].ShowHintLeft();
-            AddHintToDisable(matrix[x, y]);
-            return true;
+    // Check for XoXX or XXoX
+    private MiniList<DotController> GetCandidateTypeRow3(int y, int x1, int x2, int x3, int x4) {
+        if (matrix[x1, y].dot == matrix[x2, y].dot &&
+            matrix[x1, y].dot == matrix[x4, y].dot) {
+            // XXoX
+            var row3 = MiniListRow(y, x1, x2, x4);
+            if (x4 < width -1 && matrix[x1, y].dot == matrix[x4 + 1, y].dot) {
+                // XXoXX
+                // We only look for one single hint, so we got the XXoXX here first
+                row3.Add(matrix[x4 + 1, y]);
+            }
+            return row3;
         }
 
-        return false;
-    }
-
-    private bool ShowHintRight(int x, int y, int p) {
-        if (IsDot(x, y, p)) {
-            matrix[x, y].ShowHintRight();
-            AddHintToDisable(matrix[x, y]);
-            return true;
+        if (matrix[x1, y].dot == matrix[x3, y].dot &&
+            matrix[x1, y].dot == matrix[x4, y].dot) {
+            // XoXX
+            return MiniListRow(y, x1, x3, x4);
         }
 
-        return false;
+        return null;
     }
 
-    private bool ShowHintUp(int x, int y, int p) {
-        if (IsDot(x, y, p)) {
-            matrix[x, y].ShowHintUp();
-            AddHintToDisable(matrix[x, y]);
-            return true;
+    // Check for
+    // X X
+    // o X
+    // X o
+    // X X
+    private MiniList<DotController> GetCandidateTypeCol3(int x, int y1, int y2, int y3, int y4) {
+        if (matrix[x, y1].dot == matrix[x, y2].dot &&
+            matrix[x, y1].dot == matrix[x, y4].dot) {
+            // XXoX
+            var col3 = MiniListCol(x, y1, y2, y4);
+            if (y4 < height -1 && matrix[x, y1].dot == matrix[x, y4 + 1].dot) {
+                // XXoXX
+                // We only look for one single hint, so we got the XXoXX here first
+                col3.Add(matrix[x, y4 + 1]);
+            }
+            return col3;
         }
 
-        return false;
-    }
-
-    private bool ShowHintDown(int x, int y, int p) {
-        if (IsDot(x, y, p)) {
-            matrix[x, y].ShowHintDown();
-            AddHintToDisable(matrix[x, y]);
-            return true;
+        if (matrix[x, y1].dot == matrix[x, y3].dot &&
+            matrix[x, y1].dot == matrix[x, y4].dot) {
+            // XoXX
+            return MiniListCol(x, y1, y3, y4);
         }
 
-        return false;
+        return null;
     }
 
-    private bool IsDot(int x, int y, int p) {
-        return x >= 0 && x < width && y >= 0 && y < height && matrix[x, y].dot == p;
+    private MiniList<DotController> MiniListRow(int y, int x1, int x2, int x3 = -1) {
+        var list = new MiniList<DotController>(4); // 4, just in case we got the XXoXX hint
+        list.Add(matrix[x1, y]);
+        list.Add(matrix[x2, y]);
+        if (x3 != -1) list.Add(matrix[x3, y]);
+        return list;
+    }
+
+    private MiniList<DotController> MiniListCol(int x, int y1, int y2, int y3 = -1) {
+        var list = new MiniList<DotController>(4); // 4, just in case we got the XXoXX hint
+        list.Add(matrix[x, y1]);
+        list.Add(matrix[x, y2]);
+        if (y3 != -1) list.Add(matrix[x, y3]);
+        return list;
+    }
+
+    // Check for oXX XXo   X X
+    //           X     X XXo oXX
+    private MiniList<DotController> GetCandidateTypeRowL(int y, int x1, int x2, int x3) {
+        if (matrix[x1, y].dot == matrix[x2, y].dot) {
+            // XXo
+            if (y >= 1 && matrix[x1, y].dot == matrix[x3, y - 1].dot) {
+                // XXo 
+                //   X
+                return MiniListRow(y, x1, x2).Add(matrix[x3, y - 1]);
+            }
+
+            if (y < height - 1 && matrix[x1, y].dot == matrix[x3, y + 1].dot) {
+                // XXo 
+                //   X
+                return MiniListRow(y, x1, x2).Add(matrix[x3, y + 1]);
+            }
+        }
+
+        if (matrix[x2, y].dot == matrix[x3, y].dot) {
+            // oXX
+            if (y >= 1 && matrix[x1, y - 1].dot == matrix[x2, y].dot) {
+                // oXX 
+                // X
+                return MiniListRow(y, x2, x3).Add(matrix[x1, y - 1]);
+            }
+
+            if (y < height - 1 && matrix[x1, y + 1].dot == matrix[x2, y].dot) {
+                // oXX 
+                // X
+                return MiniListRow(y, x2, x3).Add(matrix[x1, y + 1]);
+            }
+        }
+
+        return null;
+    }
+
+    // Check for (y1 down to y3 up)
+    // oX Xo X   X
+    // X   X X   X
+    // X   X oX Xo
+    private MiniList<DotController> GetCandidateTypeColL(int x, int y1, int y2, int y3) {
+        if (matrix[x, y1].dot == matrix[x, y2].dot) {
+            // o
+            // X
+            // X
+            if (x >= 1 && matrix[x, y1].dot == matrix[x - 1, y3].dot) {
+                // Xo 
+                //  X
+                //  X
+                return MiniListCol(x, y1, y2).Add(matrix[x - 1, y3]);
+            }
+
+            if (x < width - 1 && matrix[x, y1].dot == matrix[x + 1, y3].dot) {
+                //  oX 
+                //  X
+                //  X
+                return MiniListCol(x, y1, y2).Add(matrix[x + 1, y3]);
+            }
+        }
+
+        if (matrix[x, y2].dot == matrix[x, y3].dot) {
+            // X
+            // X
+            // o
+            if (x >= 1 && matrix[x - 1, y1].dot == matrix[x, y2].dot) {
+                //  X
+                //  X
+                // Xo
+                return MiniListCol(x, y2, y3).Add(matrix[x - 1, y1]);
+            }
+
+            if (x < width - 1 && matrix[x + 1, y1].dot == matrix[x, y2].dot) {
+                // X
+                // X
+                // oX
+                return MiniListCol(x, y2, y3).Add(matrix[x + 1, y1]);
+            }
+        }
+
+        return null;
     }
 
 
@@ -547,6 +640,7 @@ public class BoardController : MonoBehaviour {
                         } else {
                             matches.SetFirstRow(matrix[x - 2, y]);
                         }
+
                         matches.MarkToBeDestroyed(matrix[x, y]);
                         matches.MarkToBeDestroyed(matrix[x - 1, y]);
                         matches.MarkToBeDestroyed(matrix[x - 2, y]);
@@ -568,6 +662,7 @@ public class BoardController : MonoBehaviour {
                         } else {
                             matches.SetFirstCol(matrix[x, y]);
                         }
+
                         matches.MarkToBeDestroyed(matrix[x, y]);
                         matches.MarkToBeDestroyed(matrix[x, y - 1]);
                         matches.MarkToBeDestroyed(matrix[x, y - 2]);
@@ -591,7 +686,7 @@ public class BoardController : MonoBehaviour {
         }
 
         SetStateDestroying();
-        yield return new WaitForSeconds(0.225F);
+        yield return new WaitForSeconds(0.07F);
 
         for (int i = 0; i < matches.matches.Count; i++) {
             matches.matches[i].NiceDestroy();
@@ -607,9 +702,9 @@ public class BoardController : MonoBehaviour {
     }
 
     private void ShowScore(Matches matches) {
-        Debug.Log(matches.matches.Count+" points!");
-        var text = matches.matches.Count+" points!";
-        
+        Debug.Log(matches.matches.Count + " points!");
+        var text = matches.matches.Count + " points!";
+
         if (matches.row4) {
             Debug.Log("ROW4!");
             text = text + " (row 4)";
@@ -637,7 +732,6 @@ public class BoardController : MonoBehaviour {
         }
 
         _textMeshPro.GetComponent<TMP_Text>().text = text;
-
     }
 
     private void ReplaceDestroyed(Matches matches) {
@@ -651,7 +745,7 @@ public class BoardController : MonoBehaviour {
 
         for (int x = 0; x < width; x++) {
             if (matches.dirtyCol[x] == false) continue;
-            
+
             // Reorganize the column
             MiniList<DotController> columnAlive = new MiniList<DotController>(height);
             MiniList<DotController> columnDestroyed = new MiniList<DotController>(height);
@@ -675,23 +769,15 @@ public class BoardController : MonoBehaviour {
             }
         }
 
-        ClearHints();
-        int h = ShowHints();
-        ClearHints();
-        if (h == 0) {
-            Debug.Log("FUCK");
-        }
-
         if (matches.firstRow != null) {
             // Avoid deadlock creating a good row that can be matched in the next move
-            ForceRow(matches.firstRow.x);            
+            ForceRow(matches.firstRow.x);
         }
 
         if (matches.firstCol != null) {
             // Avoid deadlock creating a good column that can be matched in the next move
-            ForceCol(matches.firstCol.x);            
+            ForceCol(matches.firstCol.x);
         }
-        
     }
 
     private void ForceRow(int x) {
@@ -712,7 +798,7 @@ public class BoardController : MonoBehaviour {
             }
 
             matrix[x + 2, y].SetType(dotC);
-            
+
             matrix[x, y].SetDebugText("r");
             matrix[x + 1, y].SetDebugText("r");
             matrix[x + 2, y].SetDebugText(debugText);
@@ -740,7 +826,7 @@ public class BoardController : MonoBehaviour {
             }
 
             matrix[x, y].SetType(dotC);
-            
+
             matrix[x, y].SetDebugText(debugText);
             matrix[x + 1, y].SetDebugText("R");
             matrix[x + 2, y].SetDebugText("R");
@@ -765,7 +851,7 @@ public class BoardController : MonoBehaviour {
         }
 
         matrix[x, y - 2].SetType(dotC);
-        
+
         matrix[x, y].SetDebugText("d");
         matrix[x, y - 1].SetDebugText("d");
         matrix[x, y - 2].SetDebugText(debugText);
@@ -786,7 +872,7 @@ public class BoardController : MonoBehaviour {
 
     public void UserClicks(DotController dot) {
         dot.SetType(dotTypes[(dot.dotType.number + 1) % maxTypes]);
-        ClearHints();
         ShowHints();
+        SetStateUnknown();
     }
 }

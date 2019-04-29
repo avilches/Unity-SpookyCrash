@@ -1213,16 +1213,6 @@ PrefabInstance:
       propertyPath: positionPrefab
       value: 
       objectReference: {fileID: 0}
-    - target: {fileID: 6413279388497168435, guid: df8ba81b7a7d5cd45b68376b87fb43e6,
-        type: 3}
-      propertyPath: width
-      value: 9
-      objectReference: {fileID: 0}
-    - target: {fileID: 6413279388497168435, guid: df8ba81b7a7d5cd45b68376b87fb43e6,
-        type: 3}
-      propertyPath: height
-      value: 9
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: df8ba81b7a7d5cd45b68376b87fb43e6, type: 3}
 --- !u!114 &5360896110562190895 stripped

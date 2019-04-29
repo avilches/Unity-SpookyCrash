@@ -2,10 +2,7 @@
 using UnityEngine;
 
 public class DotController : MonoBehaviour {
-    public GameObject hintUp;
-    public GameObject hintDown;
     public GameObject hintRight;
-    public GameObject hintLeft;
     public GameObject explosionPrefab;
     public GameObject debugText;
 
@@ -159,30 +156,11 @@ public class DotController : MonoBehaviour {
         }
     }
 
-    public void DisableHints() {
-        hintLeft.SetActive(false);
+    public void DisableHint() {
         hintRight.SetActive(false);
-        hintUp.SetActive(false);
-        hintDown.SetActive(false);
     }
 
-    public void ShowHintLeft() {
-        DisableHints();
-        hintLeft.SetActive(true);
-    }
-
-    public void ShowHintRight() {
-        DisableHints();
+    public void EnableHint() {
         hintRight.SetActive(true);
-    }
-
-    public void ShowHintUp() {
-        DisableHints();
-        hintUp.SetActive(true);
-    }
-
-    public void ShowHintDown() {
-        DisableHints();
-        hintDown.SetActive(true);
     }
 }

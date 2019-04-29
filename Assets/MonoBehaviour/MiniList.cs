@@ -15,12 +15,22 @@ class MiniList<T> : IEnumerable<T> {
         get { return Count == 0; }
     }
 
-    public void Add(T ele) {
+    public MiniList<T> Add(T ele) {
         if (Count == Array.Length) {
             throw new IndexOutOfRangeException("Impossible adding more element, array size (" + Count + ")");
         }
 
         Array[Count++] = ele;
+        return this;
+    }
+
+    public MiniList<T> AddAll(IEnumerable<T> other) {
+        if (other == null) return this;
+        foreach (T ele in other) {
+            Add(ele);
+        }
+
+        return this;
     }
 
     public bool Contains(T ele) {
