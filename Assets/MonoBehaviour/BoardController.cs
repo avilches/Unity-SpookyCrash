@@ -871,8 +871,8 @@ public class BoardController : MonoBehaviour {
     }
 
     public void UserClicks(DotController dot) {
-        dot.SetType(dotTypes[(dot.dotType.number + 1) % maxTypes]);
-        ShowHints();
-        SetStateUnknown();
+        //dot.SetType(dotTypes[(dot.dotType.number + 1) % maxTypes]);
+        //ShowHints();
+        //SetStateUnknown();
     }
 }

@@ -2,7 +2,7 @@
 using UnityEngine;
 
 public class DotController : MonoBehaviour {
-    public GameObject hintRight;
+    private Animator hintAnimator;
     public GameObject explosionPrefab;
     public GameObject debugText;
 
@@ -38,6 +38,8 @@ public class DotController : MonoBehaviour {
 
     private void Awake() {
         cam = Camera.main;
+        hintAnimator = GetComponent<Animator>();
+        DisableHint();
         ConfigureTextMeshSortingLayer();
     }
 
@@ -112,7 +114,7 @@ public class DotController : MonoBehaviour {
         GameObject explosion = Instantiate(explosionPrefab, new Vector3(transform.position.x,
             transform.position.y, -1F), Quaternion.identity);
         explosion.GetComponent<Renderer>().sortingLayerName = "particles";
-        Destroy(explosion, 0.2F);
+        Destroy(explosion, 1F);
     }
 
 
@@ -157,10 +159,11 @@ public class DotController : MonoBehaviour {
     }
 
     public void DisableHint() {
-        hintRight.SetActive(false);
+        hintAnimator.enabled = false;
+        transform.localScale = new Vector3(5,5,5);
     }
 
     public void EnableHint() {
-        hintRight.SetActive(true);
+        hintAnimator.enabled = true;
     }
 }

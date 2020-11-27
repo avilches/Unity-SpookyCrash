@@ -170,6 +170,7 @@ GameObject:
   - component: {fileID: 2182292398416671757}
   - component: {fileID: 2571604403206542986}
   - component: {fileID: 8818379164891879986}
+  - component: {fileID: 4463377967956230115}
   m_Layer: 8
   m_Name: Dot
   m_TagString: dot
@@ -231,7 +232,7 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 1092806855
-  m_SortingLayer: 1
+  m_SortingLayer: 0
   m_SortingOrder: 0
   m_Sprite: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -282,13 +283,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 74eca7a4447c01b489eb4f5bac123cb4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hintUp: {fileID: 2055360613218000620}
-  hintDown: {fileID: 880421134395481350}
-  hintRight: {fileID: 2261707994472841612}
-  hintLeft: {fileID: 8075571081776154968}
-  explosionPrefab: {fileID: 85010229559362734, guid: a7e93e419b441764b9d13139743705e3,
+  explosionPrefab: {fileID: 1329845292236604, guid: 9bba9cf244c53c5439505dfc96fdd11c,
     type: 3}
   debugText: {fileID: 3091653759534675165}
+--- !u!95 &4463377967956230115
+Animator:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2182292398416671756}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: a8240fbdfa119cc4f85ee7e380bdeddc, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorControllerStateOnDisable: 0
 --- !u!1 &2261707994472841612
 GameObject:
   m_ObjectHideFlags: 0
@@ -434,8 +450,8 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 1092806855
-  m_SortingLayer: 1
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
   m_SortingOrder: 1
 --- !u!102 &3388088707252631250
 TextMesh:
